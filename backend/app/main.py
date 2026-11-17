@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
+from math import radians, sin, cos, asin, sqrt
 import os
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +34,46 @@ def list_donors(blood_group:str|None=None, city:str|None=None, available:bool|No
     if city: q=q.filter(func.lower(m.Donor.city)==city.lower())
     if available is not None: q=q.filter(m.Donor.available==available)
     return q.order_by(m.Donor.created_at.desc()).offset(offset).limit(limit).all()
+
+@app.get("/api/donors/nearby")
+def nearby_donors(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+    radius_km: float = Query(10, gt=0, le=500),
+    blood_group: str | None = None,
+    db: Session = Depends(get_db),
+):
+    donors = db.query(m.Donor).filter(
+        m.Donor.available == True,
+        m.Donor.latitude.isnot(None),
+        m.Donor.longitude.isnot(None),
+    )
+
+    if blood_group:
+        group = blood_group.upper().replace("−", "-")
+        if group not in s.BLOOD_GROUPS:
+            raise HTTPException(422, "Invalid blood group")
+        donors = donors.filter(m.Donor.blood_group == group)
+
+    results = []
+    for donor in donors.all():
+        lat1, lon1 = radians(latitude), radians(longitude)
+        lat2, lon2 = radians(donor.latitude), radians(donor.longitude)
+        dlat, dlon = lat2 - lat1, lon2 - lon1
+        value = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+        distance = 6371 * 2 * asin(sqrt(value))
+
+        if distance <= radius_km:
+            results.append({
+                "id": donor.id,
+                "full_name": donor.full_name,
+                "blood_group": donor.blood_group,
+                "city": donor.city,
+                "distance_km": round(distance, 2),
+            })
+
+    return sorted(results, key=lambda item: item["distance_km"])
+
 @app.get("/api/donors/{donor_id}",response_model=s.DonorOut)
 def get_donor(donor_id:int,db:Session=Depends(get_db)):
     obj=db.get(m.Donor,donor_id)
@@ -87,6 +128,55 @@ def list_requests(status:str|None=None,city:str|None=None,blood_group:str|None=N
     if city: q=q.filter(func.lower(m.BloodRequest.city)==city.lower())
     if blood_group: q=q.filter(m.BloodRequest.blood_group==blood_group.upper().replace("−","-"))
     return q.order_by(m.BloodRequest.created_at.desc()).all()
+@app.get("/api/requests/{request_id}/nearby-donors")
+def nearby_donors_for_request(
+    request_id: int,
+    radius_km: float = Query(25, gt=0, le=500),
+    db: Session = Depends(get_db),
+):
+    blood_request = db.get(m.BloodRequest, request_id)
+    if not blood_request:
+        raise HTTPException(404, "Blood request not found")
+
+    if blood_request.latitude is None or blood_request.longitude is None:
+        raise HTTPException(422, "This blood request has no saved GPS location")
+
+    donors = db.query(m.Donor).filter(
+        m.Donor.available == True,
+        m.Donor.blood_group == blood_request.blood_group,
+        m.Donor.latitude.isnot(None),
+        m.Donor.longitude.isnot(None),
+    ).all()
+
+    results = []
+    request_lat = radians(blood_request.latitude)
+    request_lon = radians(blood_request.longitude)
+
+    for donor in donors:
+        donor_lat = radians(donor.latitude)
+        donor_lon = radians(donor.longitude)
+
+        dlat = donor_lat - request_lat
+        dlon = donor_lon - request_lon
+
+        value = (
+            sin(dlat / 2) ** 2
+            + cos(request_lat) * cos(donor_lat) * sin(dlon / 2) ** 2
+        )
+        distance = 6371 * 2 * asin(sqrt(min(1, value)))
+
+        if distance <= radius_km:
+            results.append({
+                "id": donor.id,
+                "full_name": donor.full_name,
+                "blood_group": donor.blood_group,
+                "city": donor.city,
+                "distance_km": round(distance, 2),
+            })
+
+    return sorted(results, key=lambda item: item["distance_km"])
+
+
 @app.patch("/api/requests/{request_id}/status",response_model=s.BloodRequestOut)
 def update_request_status(request_id:int,data:s.RequestStatusUpdate,db:Session=Depends(get_db)):
     if data.status not in {"pending","matched","fulfilled","cancelled"}: raise HTTPException(422,"Invalid request status")

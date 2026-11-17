@@ -522,6 +522,17 @@
     box-shadow: 0 30px 80px rgb(30 10 14 / 25%);
   }
 
+  /* Hide all maps while any dialog is open */
+  body:has(.dialog-backdrop) .leaflet-container {
+    display: none !important;
+  }
+
+  /* Keep long dialogs usable on smaller screens */
+  .dialog-card {
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+  }
+
   .dialog-close {
     position: absolute;
     top: 16px;
