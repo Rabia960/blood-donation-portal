@@ -21,6 +21,7 @@ import {
 } from "./api";
 import CentersMap from "./components/CentersMap";
 import AppointmentsPanel from "./components/AppointmentsPanel";
+import InventoryPanel from "./components/InventoryPanel";
 
 type IconName =
   | "grid"
@@ -127,6 +128,7 @@ const navItems: { label: string; icon: IconName }[] = [
   { label: "Donate blood", icon: "heart" },
   { label: "Appointments", icon: "calendar" },
   { label: "Donation history", icon: "history" },
+  { label: "Inventory management", icon: "drop" },
 ];
 
 function Logo() {
@@ -529,6 +531,11 @@ function App() {
       return;
     }
 
+    if (label === "Inventory management") {
+      setDialog({ title: label, detail: "View and update centre blood stock." });
+      return;
+    }
+
     if (label === "Donation history") {
       setDialog({
         title: label,
@@ -678,8 +685,8 @@ function App() {
               </h2>
 
               <p className="mt-4 max-w-[560px] text-[14px] leading-6 text-white/78 sm:text-[15px]">
-                Local hospitals urgently need O−, B−, and AB− blood. One
-                donation can help save up to three lives.
+                Check blood availability by group at nearby centres. Contact
+                the centre to confirm current stock before visiting.
               </p>
             </div>
 
@@ -1242,6 +1249,8 @@ function App() {
               </div>
             ) : dialog.title === "Appointments" || dialog.title === "Schedule a donation" ? (
               <AppointmentsPanel centers={centers} />
+            ) : dialog.title === "Inventory management" ? (
+              <InventoryPanel centers={centers} />
             ) : dialog.title === "Emergency blood request" ? (
               /* EMERGENCY REQUEST */
               <form

@@ -101,6 +101,8 @@ export interface BloodRequestInput {
 
 export const getDashboard = (city?: string) => apiRequest<DashboardData>(`/dashboard${city ? `?city=${encodeURIComponent(city)}` : ""}`);
 export const getInventory = (city?: string) => apiRequest<InventoryItem[]>(`/inventory${city ? `?city=${encodeURIComponent(city)}` : ""}`);
+
+export const updateInventory = (centerId: number, bloodGroup: string, units: number) => apiRequest<{ id: number; center_id: number; blood_group: string; units: number; updated_at: string }>(`/centers/${centerId}/inventory/${encodeURIComponent(bloodGroup)}`, { method: "PUT", body: JSON.stringify({ units }) });
 export const getCenters = (city?: string) => apiRequest<Center[]>(`/centers${city ? `?city=${encodeURIComponent(city)}` : ""}`);
 export const registerDonor = (data: DonorInput) => apiRequest("/donors", { method: "POST", body: JSON.stringify(data) });
 export const submitBloodRequest = (data: BloodRequestInput) => apiRequest("/requests", { method: "POST", body: JSON.stringify(data) });

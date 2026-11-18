@@ -740,3 +740,6 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Keep the longer inventory navigation label on one line */
+.nav-item:last-child { gap: 8px; padding-left: 10px; padding-right: 10px; font-size: 13px; white-space: nowrap; }
